@@ -1,0 +1,1 @@
+# Connect computer power to AI inference with AWS IOT to use matadata in cloud
