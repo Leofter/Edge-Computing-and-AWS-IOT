@@ -1,17 +1,7 @@
 
-opencv 
-
-transformers
-
-pillow
-
-torch
-
-ultralytics
+ultralytics 
 
 dotenv
-
-mlflow
 
 pathlib
 
@@ -22,3 +12,7 @@ paddleocr
 awsiotsdk
 
 awsiot
+
+boto3
+
+paho-mqtt
