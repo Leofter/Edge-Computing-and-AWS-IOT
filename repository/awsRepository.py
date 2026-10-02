@@ -1,6 +1,5 @@
 from awscrt import mqtt
 from awsiot import mqtt_connection_builder
-import time
 
 import os
 from dotenv import load_dotenv
@@ -14,8 +13,8 @@ KEY_PATH = os.getenv("KEY_PATH")
 CA_PATH = os.getenv("CA_PATH")
 TOPIC = os.getenv("TOPIC")
 
-# Connect
-print("Connecting to AWS IoT Core...")
+
+print("Connecting to AWS IoT...")
 mqtt_connection = mqtt_connection_builder.mtls_from_path(
     endpoint=ENDPOINT,
     cert_filepath=CERT_PATH,
@@ -25,24 +24,3 @@ mqtt_connection = mqtt_connection_builder.mtls_from_path(
     clean_session=False,
     keep_alive_secs=30,
 )
-
-mqtt_connection.connect().result()
-print("Connected")
-
-# Send a test message
-import json
-
-test_message = {
-    "device_id": CLIENT_ID,
-    "message": "Hello from VSCode!",
-    "timestamp": int(time.time()),
-}
-
-mqtt_connection.publish(
-    topic=TOPIC, payload=json.dumps(test_message), qos=mqtt.QoS.AT_LEAST_ONCE
-)
-print(f"Test message sent: {test_message}")
-
-# Disconnect
-mqtt_connection.disconnect().result()
-print("Done")
