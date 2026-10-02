@@ -24,3 +24,5 @@ mqtt_connection = mqtt_connection_builder.mtls_from_path(
     clean_session=False,
     keep_alive_secs=30,
 )
+
+
