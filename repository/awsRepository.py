@@ -3,11 +3,19 @@ from awsiot import mqtt_connection_builder
 
 import os
 from dotenv import load_dotenv
+import abc
 
 load_dotenv()
 
 
-class ConnectAwsIot:
+class ConnectAws(abc):
+
+    @abc.abstractmethod
+    def connect():
+        pass
+
+
+class ConnectAwsIot(ConnectAws):
     def __init__(
         self,
         ENDPOINT,
@@ -26,7 +34,7 @@ class ConnectAwsIot:
         self.clean_session = clean_session
         self.keep_alive_secs = keep_alive_secs
 
-    def conect(self):
+    def connect(self):
         print("Connecting to AWS IoT...")
         self.mqtt_connection = mqtt_connection_builder.mtls_from_path(
             endpoint=self.endpoint,
@@ -49,3 +57,6 @@ class ConnectAwsIot:
         self.mqtt_connection.publish(
             topic=topic, payload=messege, qos=mqtt.QoS.AT_LEAST_ONCE
         )
+
+class ConectAwsS3(ConnectAws):
+    pass
