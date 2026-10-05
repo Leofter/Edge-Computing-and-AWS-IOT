@@ -31,7 +31,7 @@ S3_BUCKET = os.getenv("S3_BUCKET")
 
 # CONFIG YOLO
 yolo_model = os.getenv("YOLO_MODEL")
-image_path = os.getenv("IMAGE_PATH")
+image_path = os.getenv("IMAGE_PATH") #corrigir para dataset e image
 conf = 0.5
 
 # CONFIG OCR
