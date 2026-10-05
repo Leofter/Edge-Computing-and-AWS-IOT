@@ -1,9 +1,13 @@
 from awscrt import mqtt
 from awsiot import mqtt_connection_builder
+import boto3
+
 
 import os
 from dotenv import load_dotenv
 import abc
+import uuid
+from datetime import datetime, timezone
 
 load_dotenv()
 
@@ -18,19 +22,19 @@ class ConnectAws(abc):
 class ConnectAwsIot(ConnectAws):
     def __init__(
         self,
-        ENDPOINT,
-        CERT_PATH,
-        KEY_PATH,
-        CA_PATH,
-        CLIENT_ID,
+        endpoint,
+        cert_path,
+        key_path,
+        ca_path,
+        client_id,
         clean_session,
         keep_alive_secs,
     ):
-        self.endpoint = ENDPOINT
-        self.cert_path = CERT_PATH
-        self.pri_key_filepath = KEY_PATH
-        self.ca_filepath = CA_PATH
-        self.client_id = CLIENT_ID
+        self.endpoint = endpoint
+        self.cert_path = cert_path
+        self.pri_key_filepath = key_path
+        self.ca_filepath = ca_path
+        self.client_id = client_id
         self.clean_session = clean_session
         self.keep_alive_secs = keep_alive_secs
 
@@ -58,5 +62,28 @@ class ConnectAwsIot(ConnectAws):
             topic=topic, payload=messege, qos=mqtt.QoS.AT_LEAST_ONCE
         )
 
-class ConectAwsS3(ConnectAws):
-    pass
+
+class AwsS3(ConnectAws):
+
+    def connect(self, bucket_name, client_id):
+        self.client_id = client_id
+        self.s3 = boto3.resource("s3")
+        self.bucket = self.s3.Bucket(bucket_name)
+        self.bucket_name = bucket_name
+
+    def upload_s3(self, inference_id, image_path) -> str:
+        self.image_path = image_path
+        now = datetime.now(timezone.utc)
+
+        s3_key = f"inference-image/{self.client_id}/{now:%Y/%m/%d}/{inference_id}.jpg"
+
+        self.bucket.upload_file(
+            file_name=self.image_path,
+            key=s3_key,
+            ExtraArgs={
+                "ContentType": "image/jpeg",
+                "Metadata": {"inference_id": inference_id, "device_id": self.client_id},
+            },
+        )
+
+        return f"s3://{self.bucket}/{s3_key}"
