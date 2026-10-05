@@ -5,17 +5,16 @@ import boto3
 
 import os
 from dotenv import load_dotenv
-import abc
-import uuid
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 
 load_dotenv()
 
 
-class ConnectAws(abc):
+class ConnectAws(ABC):
 
-    @abc.abstractmethod
-    def connect():
+    @abstractmethod
+    def connect(self):
         pass
 
 
@@ -63,7 +62,7 @@ class ConnectAwsIot(ConnectAws):
         )
 
 
-class AwsS3(ConnectAws):
+class AwsS3:
 
     def connect(self, bucket_name, client_id):
         self.client_id = client_id
@@ -78,12 +77,12 @@ class AwsS3(ConnectAws):
         s3_key = f"inference-image/{self.client_id}/{now:%Y/%m/%d}/{inference_id}.jpg"
 
         self.bucket.upload_file(
-            file_name=self.image_path,
-            key=s3_key,
+            Filename=self.image_path,
+            Key=s3_key,
             ExtraArgs={
                 "ContentType": "image/jpeg",
                 "Metadata": {"inference_id": inference_id, "device_id": self.client_id},
             },
         )
 
-        return f"s3://{self.bucket}/{s3_key}"
+        return f"s3://{self.bucket_name}/{s3_key}"

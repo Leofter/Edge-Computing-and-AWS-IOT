@@ -4,3 +4,4 @@ model
 dataset-test
 ocr_output
 apagar.py
+repository/__pycache__
