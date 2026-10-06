@@ -13,6 +13,8 @@ from service.pipeline import detection as dt
 
 from repository import awsRepository
 
+from validation.valid_path import ValidPath
+
 from api.dto.ocrResultDto import OCRResultDTO
 
 load_dotenv()
@@ -31,7 +33,7 @@ S3_BUCKET = os.getenv("S3_BUCKET")
 
 # CONFIG YOLO
 yolo_model = os.getenv("YOLO_MODEL")
-image_path = os.getenv("IMAGE_PATH") #corrigir para dataset e image
+image_path = os.getenv("IMAGE_PATH")  # corrigir para dataset e image
 conf = 0.5
 
 # CONFIG OCR
@@ -69,16 +71,19 @@ mqtt_connection.connect().result()
 print("Connected iot")
 
 
-for item in ocr_result:
+files = list(ValidPath().validation(image_path))
+
+
+for file, item in zip(files, ocr_result):
+
+    # DTO do OCR
     raw_data = item.get("res", item)
-
     dto = OCRResultDTO(**raw_data)
-
     ocr_result_json = dto.model_dump(exclude_none=True)
 
     # save s3
     inference_id = str(uuid.uuid4())
-    s3_uri = s3.upload_s3(inference_id, image_path)
+    s3_uri = s3.upload_s3(inference_id, file)
 
     message = {
         "inference_id": inference_id,

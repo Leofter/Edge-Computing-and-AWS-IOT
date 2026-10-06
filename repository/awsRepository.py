@@ -2,13 +2,9 @@ from awscrt import mqtt
 from awsiot import mqtt_connection_builder
 import boto3
 
-
-import os
-from dotenv import load_dotenv
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-
-load_dotenv()
+from os import PathLike
 
 
 class ConnectAws(ABC):
@@ -70,14 +66,13 @@ class AwsS3:
         self.bucket = self.s3.Bucket(bucket_name)
         self.bucket_name = bucket_name
 
-    def upload_s3(self, inference_id, image_path) -> str:
-        self.image_path = image_path
+    def upload_s3(self, inference_id: str, image_path: str | PathLike[str]) -> str:
         now = datetime.now(timezone.utc)
 
         s3_key = f"inference-image/{self.client_id}/{now:%Y/%m/%d}/{inference_id}.jpg"
 
         self.bucket.upload_file(
-            Filename=self.image_path,
+            Filename=image_path,
             Key=s3_key,
             ExtraArgs={
                 "ContentType": "image/jpeg",
