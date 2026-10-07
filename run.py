@@ -13,7 +13,8 @@ from service.pipeline import detection as dt
 
 from datetime import datetime
 
-from repository import awsRepository
+from repository.awsRepository import AwsS3
+from repository.awsRepository import AwsSNS
 
 from validation.valid_path import ValidPath
 
@@ -32,6 +33,9 @@ TOPIC = os.getenv("TOPIC")
 
 # S3
 S3_BUCKET = os.getenv("S3_BUCKET")
+
+# SNS
+SNS_TOPIC = os.getenv("SNS_TOPIC")
 
 # CONFIG YOLO
 yolo_model = os.getenv("YOLO_MODEL")
@@ -55,8 +59,12 @@ image_roi = roi.apply_roi(Crop_mode, detection_result)
 ocr_result = ocr.apply_ocr(ocr_init, image_roi, ocr_output)
 
 # connect s3
-s3 = awsRepository.AwsS3()
+s3 = AwsS3()
 s3.connect(S3_BUCKET, CLIENT_ID)
+
+# connect sns
+sns = AwsSNS()
+sns.connect(SNS_TOPIC)
 
 # Connect iot
 mqtt_connection = mqtt_connection_builder.mtls_from_path(
@@ -85,8 +93,9 @@ for file, item in zip(files, ocr_result):
 
     # save s3
     inference_id = str(uuid.uuid4())
-    s3_uri = s3.upload_s3(inference_id, file)
+    s3_uri = s3.upload(inference_id, file)
 
+    # mensagem
     message = {
         "inference_id": inference_id,
         "device_id": CLIENT_ID,
@@ -100,6 +109,8 @@ for file, item in zip(files, ocr_result):
         topic=TOPIC, payload=json.dumps(message), qos=mqtt.QoS.AT_LEAST_ONCE
     )
     print(f"Test message sent: {message}")
+
+    sns.publish(True)
 
 
 mqtt_connection.disconnect().result()

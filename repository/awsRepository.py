@@ -1,6 +1,7 @@
 from awscrt import mqtt
 from awsiot import mqtt_connection_builder
 import boto3
+import json
 
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
@@ -66,7 +67,7 @@ class AwsS3:
         self.bucket = self.s3.Bucket(bucket_name)
         self.bucket_name = bucket_name
 
-    def upload_s3(self, inference_id: str, image_path: str | PathLike[str]) -> str:
+    def upload(self, inference_id: str, image_path: str | PathLike[str]) -> str:
         now = datetime.now(timezone.utc)
 
         s3_key = f"inference-image/{self.client_id}/{now:%Y/%m/%d}/{inference_id}.jpg"
@@ -81,3 +82,29 @@ class AwsS3:
         )
 
         return f"s3://{self.bucket_name}/{s3_key}"
+
+
+class AwsSNS:
+
+    def connect(self, sns_topic):
+        self.sns = boto3.resource("sns", region_name="us-east-2")
+        self.topic = self.sns.Topic(sns_topic)
+        self.sns_topic = sns_topic
+
+    def publish(self, alerta: bool) -> str:
+        self.alerta = alerta
+        # self.id_ocr = id_ocr -> futuramente adicionar
+
+        if self.alerta == True:
+
+            mensage = {
+                "tipo": "ALERTA",
+                "motivo": f"Desconformidade",
+            }
+
+            self.topic.publish(
+                Subject="Alerta de Desconformidade",
+                Message=json.dumps(mensage, ensure_ascii=False, indent=2),
+            )
+            print(f"[SNS]: Alerta enviado")
+            return
