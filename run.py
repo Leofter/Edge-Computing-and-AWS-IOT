@@ -11,6 +11,8 @@ from service.pipeline import OCR as ocr
 from service.pipeline import ROI as roi
 from service.pipeline import detection as dt
 
+from datetime import datetime
+
 from repository import awsRepository
 
 from validation.valid_path import ValidPath
@@ -91,6 +93,7 @@ for file, item in zip(files, ocr_result):
         "timestamp": int(time.time()),
         "s3_uri": s3_uri,
         "ocr_data": ocr_result_json,
+        "date_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 
     mqtt_connection.publish(

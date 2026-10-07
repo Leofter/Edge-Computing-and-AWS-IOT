@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Painel com as inferências mais recentes do modelo de visão computacional.">
+  <title>Visualizador de Inferências</title>
+
+  <!--
+    AWS SDK carregado via CDN.
+    Não precisa instalar nada — o navegador baixa direto da Amazon.
+  -->
+  <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1450.0.min.js"></script>
+
+  <style>
+    :root {
+      /* Cores — 60% neutra, 30% estrutura, 10% destaque */
+      --cor-fundo:           hsl(220 14% 96%);
+      --cor-superficie:      hsl(0 0% 100%);
+      --cor-estrutura:       hsl(220 14% 92%);
+      --cor-texto:           hsl(220 20% 12%);
+      --cor-texto-suave:     hsl(220 9% 38%);
+      --cor-destaque:        hsl(211 100% 40%);
+      --cor-destaque-hover:  hsl(211 100% 33%);
+      --cor-erro:            hsl(4 72% 38%);
+      --cor-erro-fundo:      hsl(4 80% 96%);
+
+      /* Espaçamento — grid de 8 pontos */
+      --espaco-1: 8px;
+      --espaco-2: 16px;
+      --espaco-3: 24px;
+      --espaco-4: 32px;
+      --espaco-5: 48px;
+      --espaco-6: 64px;
+
+      /* Raios de borda */
+      --raio-pequeno: 8px;
+      --raio-medio:   12px;
+      --raio-grande:  16px;
+
+      /* Tipografia — duas famílias: texto e código */
+      --fonte-texto:  -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --fonte-codigo: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    /* ---------- Base ---------- */
+    *, *::before, *::after { box-sizing: border-box; }
+    * { margin: 0; }
+
+    body {
+      font-family: var(--fonte-texto);
+      font-size: 16px;
+      line-height: 24px;
+      color: var(--cor-texto);
+      background: var(--cor-fundo);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--cor-destaque);
+      outline-offset: 2px;
+    }
+
+    .sr-somente {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    /* ---------- Página ---------- */
+    .pagina {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: var(--espaco-5) var(--espaco-3);
+    }
+
+    @media (min-width: 768px) {
+      .pagina { padding: var(--espaco-6) var(--espaco-5); }
+    }
+
+    /* ---------- Topo ---------- */
+    .topo { margin-bottom: var(--espaco-5); }
+
+    .topo__titulo {
+      font-size: 32px;
+      line-height: 40px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .topo__subtitulo {
+      margin-top: var(--espaco-1);
+      color: var(--cor-texto-suave);
+    }
+
+    .controles {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--espaco-2);
+      margin-top: var(--espaco-3);
+    }
+
+    .status {
+      font-size: 14px;
+      color: var(--cor-texto-suave);
+    }
+
+    /* ---------- Botão ---------- */
+    .botao {
+      min-height: 48px;
+      padding: 0 var(--espaco-3);
+      border: 0;
+      border-radius: var(--raio-medio);
+      background: var(--cor-destaque);
+      color: var(--cor-superficie);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .botao:hover:not(:disabled) { background: var(--cor-destaque-hover); }
+
+    .botao:disabled {
+      background: var(--cor-estrutura);
+      color: var(--cor-texto-suave);
+      cursor: not-allowed;
+    }
+
+    /* ---------- Grade de cartões ---------- */
+    .grade {
+      list-style: none;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+      gap: var(--espaco-4);
+    }
+
+    .cartao {
+      height: 100%;
+      overflow: hidden;
+      border-radius: var(--raio-grande);
+      background: var(--cor-superficie);
+    }
+
+    .cartao__figura { display: flex; flex-direction: column; height: 100%; }
+
+    .moldura {
+      display: grid;
+      place-items: center;
+      aspect-ratio: 4 / 3;
+      background: var(--cor-estrutura);
+    }
+
+    .moldura img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .sem-imagem {
+      padding: var(--espaco-3);
+      font-size: 14px;
+      text-align: center;
+      color: var(--cor-texto-suave);
+    }
+
+    .info {
+      display: grid;
+      gap: var(--espaco-2);
+      padding: var(--espaco-3);
+    }
+
+    /* Leitura do OCR: o dado principal do cartão */
+    .leitura {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: var(--espaco-2);
+    }
+
+    .texto-ocr {
+      font-family: var(--fonte-codigo);
+      font-size: 24px;
+      line-height: 32px;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+
+    .texto-ocr--vazio {
+      font-family: var(--fonte-texto);
+      font-size: 16px;
+      line-height: 24px;
+      font-weight: 400;
+      color: var(--cor-texto-suave);
+    }
+
+    .confianca {
+      flex-shrink: 0;
+      font-size: 14px;
+      color: var(--cor-texto-suave);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Origem: dispositivo e horário */
+    .origem {
+      display: grid;
+      font-size: 14px;
+      line-height: 24px;
+    }
+
+    .origem time,
+    .origem .sem-data { color: var(--cor-texto-suave); }
+
+    /* JSON: recurso avançado, fechado por padrão */
+    .json summary {
+      padding: var(--espaco-1) 0;
+      font-size: 14px;
+      color: var(--cor-texto-suave);
+      cursor: pointer;
+    }
+
+    .json pre {
+      margin-top: var(--espaco-1);
+      padding: var(--espaco-2);
+      border-radius: var(--raio-pequeno);
+      background: var(--cor-fundo);
+      font-family: var(--fonte-codigo);
+      font-size: 14px;
+      line-height: 24px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-x: auto;
+    }
+
+    /* ---------- Avisos (vazio e erro) ---------- */
+    .aviso {
+      padding: var(--espaco-5) var(--espaco-3);
+      text-align: center;
+      color: var(--cor-texto-suave);
+    }
+
+    .aviso--erro {
+      padding: var(--espaco-3);
+      border-radius: var(--raio-grande);
+      text-align: left;
+      color: var(--cor-erro);
+      background: var(--cor-erro-fundo);
+    }
+
+    .aviso__titulo { font-weight: 600; }
+    .aviso__detalhe { font-size: 14px; }
+  </style>
+</head>
+<body>
+
+  <div class="pagina">
+    <header class="topo">
+      <h1 class="topo__titulo">Visualizador de Inferências</h1>
+      <p id="subtitulo" class="topo__subtitulo">Atualização automática</p>
+
+      <div class="controles">
+        <button id="btnAtualizar" class="botao" type="button">Atualizar agora</button>
+        <p id="status" class="status" role="status">Carregando…</p>
+      </div>
+    </header>
+
+    <main>
+      <ul id="lista" class="grade" role="list" aria-label="Inferências recentes"></ul>
+      <div id="aviso"></div>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      // ============================================================
+      // 1. CONFIGURAÇÃO — substitua pelos seus valores
+      // ============================================================
+      const CONFIG = Object.freeze({
+        regiao:                     'us-east-2',            // sua região AWS
+        identityPoolId:             'us-east-xxxxxxxxxxxxx',       // Cognito → Identity Pools
+        tabelaDynamoDB:             'xxxxxxxxxxxxxxxxx',           // TableName
+        campoS3Uri:                 's3_uri',               // nome exato do campo que quarda a s3_uri no DynamoDB
+        intervaloAtualizacaoMs:     30_000,                 // recarrega a cada 30 segundos
+        expiracaoUrlImagemSegundos: 3600                    // URL assinada válida por 1 hora
+      });
+
+      // Campos da inferência que aparecem na tela (e no JSON do cartão)
+      const CAMPOS_EXIBIDOS = Object.freeze(['device_id', 'date_time', 'ocr_data']);
+
+
+      // ============================================================
+      // 2. CLIENTES AWS
+      //
+      // O Cognito emite credenciais temporárias para o browser.
+      // NUNCA coloque Access Key ou Secret Key aqui diretamente.
+      // ============================================================
+      function criarClientesAws({ regiao, identityPoolId }) {
+        AWS.config.region      = regiao;
+        AWS.config.credentials = new AWS.CognitoIdentityCredentials({ IdentityPoolId: identityPoolId });
+
+        return {
+          dynamodb: new AWS.DynamoDB.DocumentClient(),
+          s3:       new AWS.S3()
+        };
+      }
+
+
+      // ============================================================
+      // 3. ACESSO A DADOS
+      // ============================================================
+
+      // Repositório: busca todas as inferências no DynamoDB.
+      // O DynamoDB devolve no máximo 1MB por chamada, então o loop
+      // segue a paginação até não restar nenhuma página.
+      class RepositorioDeInferencias {
+        #dynamodb;
+        #tabela;
+
+        constructor(dynamodb, tabela) {
+          this.#dynamodb = dynamodb;
+          this.#tabela   = tabela;
+        }
+
+        async listarTodas() {
+          const itens = [];
+          let chaveDaProximaPagina;
+
+          do {
+            const params = { TableName: this.#tabela };
+            if (chaveDaProximaPagina) params.ExclusiveStartKey = chaveDaProximaPagina;
+
+            const resposta = await this.#dynamodb.scan(params).promise();
+            itens.push(...resposta.Items);
+            chaveDaProximaPagina = resposta.LastEvaluatedKey;
+          } while (chaveDaProximaPagina);
+
+          return itens;
+        }
+      }
+
+      // Assinador: gera URL temporária para imagem privada no S3.
+      // O bucket continua privado; a URL expira no tempo configurado.
+      // Espera s3_uri no formato s3://nome-do-bucket/caminho/imagem.jpg,
+      // que é exatamente o que o boto3 salva.
+      class AssinadorDeUrlS3 {
+        #s3;
+        #expiracaoSegundos;
+
+        constructor(s3, expiracaoSegundos) {
+          this.#s3                = s3;
+          this.#expiracaoSegundos = expiracaoSegundos;
+        }
+
+        assinar(s3Uri) {
+          if (!s3Uri) return null;
+
+          const { bucket, chave } = AssinadorDeUrlS3.separarUri(s3Uri);
+          return this.#s3.getSignedUrl('getObject', {
+            Bucket:  bucket,
+            Key:     chave,
+            Expires: this.#expiracaoSegundos
+          });
+        }
+
+        static separarUri(s3Uri) {
+          const semProtocolo  = s3Uri.replace('s3://', '');
+          const primeiraBarra = semProtocolo.indexOf('/');
+
+          return {
+            bucket: semProtocolo.substring(0, primeiraBarra),
+            chave:  semProtocolo.substring(primeiraBarra + 1)
+          };
+        }
+      }
+
+
+      // ============================================================
+      // 4. MODELO DE DADOS
+      //
+      // Converte o item cru do DynamoDB no JSON padrão da inferência:
+      // {
+      //   inference_id, device_id, date_time,
+      //   ocr_data: { rec_score, rec_text },
+      //   timestamp
+      // }
+      // Aceita o OCR aninhado em ocr_data ou solto na raiz do item.
+      // Se os nomes no DynamoDB forem outros, ajuste só esta função.
+      // ============================================================
+      function normalizarInferencia(item) {
+        const ocr = item.ocr_data ?? {};
+
+        return {
+          inference_id: item.inference_id ?? null,
+          device_id:    item.device_id    ?? null,
+          date_time:    item.date_time    ?? null,
+          ocr_data: {
+            rec_score: ocr.rec_score ?? item.rec_score ?? null,
+            rec_text:  ocr.rec_text  ?? item.rec_text  ?? null
+          },
+          timestamp:    item.timestamp    ?? null
+        };
+      }
+
+      // Ordena do mais recente para o mais antigo.
+      // Registros sem data mantêm a posição relativa.
+      function maisRecentePrimeiro(a, b) {
+        if (!a.inferencia.date_time || !b.inferencia.date_time) return 0;
+        return String(b.inferencia.date_time).localeCompare(String(a.inferencia.date_time));
+      }
+
+
+      // ============================================================
+      // 5. FORMATAÇÃO
+      // ============================================================
+      const formatadorPercentual = new Intl.NumberFormat('pt-BR', {
+        style: 'percent',
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1
+      });
+
+      const formatadorDataHora = new Intl.DateTimeFormat('pt-BR', {
+        dateStyle: 'medium',
+        timeStyle: 'medium'
+      });
+
+      function formatarPercentual(score) {
+        return typeof score === 'number' ? formatadorPercentual.format(score) : null;
+      }
+
+      // Entende "2026-10-06 18:50:41". Se o formato for outro, mostra o texto original.
+      function formatarDataHora(dateTime) {
+        if (!dateTime) return null;
+
+        const partes = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(dateTime);
+        if (!partes) return { legivel: String(dateTime), iso: null };
+
+        const [ano, mes, dia, hora, minuto, segundo] = partes.slice(1).map(Number);
+        return {
+          legivel: formatadorDataHora.format(new Date(ano, mes - 1, dia, hora, minuto, segundo)),
+          iso:     `${partes[1]}-${partes[2]}-${partes[3]}T${partes[4]}:${partes[5]}:${partes[6]}`
+        };
+      }
+
+      function selecionarCampos(objeto, campos) {
+        return Object.fromEntries(campos.map(campo => [campo, objeto[campo]]));
+      }
+
+
+      // ============================================================
+      // 6. COMPONENTES DE INTERFACE
+      //
+      // Os elementos são criados via DOM (textContent), nunca por
+      // concatenação de HTML — assim o texto lido pelo OCR não pode
+      // injetar marcação na página.
+      // ============================================================
+      function el(tag, { classe, texto, atributos = {} } = {}, filhos = []) {
+        const no = document.createElement(tag);
+        if (classe)             no.className   = classe;
+        if (texto !== undefined) no.textContent = texto;
+        for (const [nome, valor] of Object.entries(atributos)) no.setAttribute(nome, valor);
+        no.append(...filhos);
+        return no;
+      }
+
+      function criarAvisoDeImagem(mensagem) {
+        return el('p', { classe: 'sem-imagem', texto: mensagem });
+      }
+
+      function criarMoldura(urlImagem) {
+        const moldura = el('div', { classe: 'moldura' });
+
+        if (!urlImagem) {
+          moldura.append(criarAvisoDeImagem('Sem imagem associada'));
+          return moldura;
+        }
+
+        const imagem = el('img', {
+          atributos: { src: urlImagem, alt: 'Imagem analisada pelo modelo', loading: 'lazy' }
+        });
+        imagem.addEventListener(
+          'error',
+          () => moldura.replaceChildren(criarAvisoDeImagem('Imagem não disponível')),
+          { once: true }
+        );
+
+        moldura.append(imagem);
+        return moldura;
+      }
+
+      function criarLeitura({ rec_text, rec_score }) {
+        const leitura = el('p', { classe: 'leitura' }, [
+          el('span', {
+            classe: rec_text ? 'texto-ocr' : 'texto-ocr texto-ocr--vazio',
+            texto:  rec_text ?? 'Nenhum texto reconhecido'
+          })
+        ]);
+
+        const percentual = formatarPercentual(rec_score);
+        if (percentual) {
+          leitura.append(
+            el('data', { classe: 'confianca', atributos: { value: String(rec_score) } }, [
+              el('span', { classe: 'sr-somente', texto: 'Confiança do OCR: ' }),
+              percentual
+            ])
+          );
+        }
+
+        return leitura;
+      }
+
+      function criarOrigem({ device_id, date_time }) {
+        const quando = formatarDataHora(date_time);
+
+        const horario = !quando
+          ? el('span', { classe: 'sem-data', texto: 'Data indisponível' })
+          : el('time', {
+              texto: quando.legivel,
+              atributos: quando.iso ? { datetime: quando.iso } : {}
+            });
+
+        return el('div', { classe: 'origem' }, [
+          el('span', { texto: device_id ?? 'Dispositivo desconhecido' }),
+          horario
+        ]);
+      }
+
+      function criarJson(inferencia) {
+        const json = JSON.stringify(selecionarCampos(inferencia, CAMPOS_EXIBIDOS), null, 2);
+
+        return el('details', { classe: 'json' }, [
+          el('summary', { texto: 'Ver JSON' }),
+          el('pre', {}, [el('code', { texto: json })])
+        ]);
+      }
+
+      // Um cartão = a imagem e, abaixo dela, as informações da inferência.
+      function criarCartao({ inferencia, urlImagem }) {
+        const legenda = el('figcaption', { classe: 'info' }, [
+          criarLeitura(inferencia.ocr_data),
+          criarOrigem(inferencia),
+          criarJson(inferencia)
+        ]);
+
+        const figura = el('figure', { classe: 'cartao__figura' }, [criarMoldura(urlImagem), legenda]);
+        return el('li', {}, [el('article', { classe: 'cartao' }, [figura])]);
+      }
+
+
+      // ============================================================
+      // 7. TELA
+      // Único ponto que mexe no DOM da página.
+      // ============================================================
+      class TelaDeInferencias {
+        #botao    = document.getElementById('btnAtualizar');
+        #status   = document.getElementById('status');
+        #lista    = document.getElementById('lista');
+        #aviso    = document.getElementById('aviso');
+
+        constructor(intervaloMs) {
+          document.getElementById('subtitulo').textContent =
+            `Atualização automática a cada ${intervaloMs / 1000} segundos`;
+        }
+
+        aoClicarEmAtualizar(acao) {
+          this.#botao.addEventListener('click', acao);
+        }
+
+        mostrarCarregando() {
+          this.#botao.disabled     = true;
+          this.#status.textContent = 'Atualizando…';
+        }
+
+        liberarBotao() {
+          this.#botao.disabled = false;
+        }
+
+        mostrarLista(registros) {
+          const total = registros.length;
+          this.#aviso.replaceChildren();
+          this.#lista.replaceChildren(...registros.map(criarCartao));
+          this.#status.textContent =
+            `${total} ${total === 1 ? 'inferência' : 'inferências'}, ` +
+            `atualizado às ${new Date().toLocaleTimeString('pt-BR')}`;
+        }
+
+        mostrarVazio() {
+          this.#lista.replaceChildren();
+          this.#aviso.replaceChildren(
+            el('p', { classe: 'aviso', texto: 'Nenhuma inferência encontrada na tabela.' })
+          );
+          this.#status.textContent = 'Nenhum dado encontrado.';
+        }
+
+        mostrarErro(erro) {
+          this.#lista.replaceChildren();
+          this.#aviso.replaceChildren(
+            el('div', { classe: 'aviso aviso--erro', atributos: { role: 'alert' } }, [
+              el('p', { classe: 'aviso__titulo', texto: 'Erro ao carregar dados' }),
+              el('p', { texto: erro.message }),
+              el('p', {
+                classe: 'aviso__detalhe',
+                texto:  'Verifique o Identity Pool ID, o nome da tabela e as permissões IAM.'
+              })
+            ])
+          );
+          this.#status.textContent = 'Erro ao carregar.';
+        }
+      }
+
+
+      // ============================================================
+      // 8. APLICAÇÃO
+      // Orquestra: busca → normaliza → ordena → desenha.
+      // ============================================================
+      class Aplicacao {
+        #repositorio;
+        #assinador;
+        #tela;
+        #intervaloMs;
+        #emAndamento = false;
+
+        constructor({ repositorio, assinador, tela, intervaloMs }) {
+          this.#repositorio = repositorio;
+          this.#assinador   = assinador;
+          this.#tela        = tela;
+          this.#intervaloMs = intervaloMs;
+        }
+
+        iniciar() {
+          this.#tela.aoClicarEmAtualizar(() => this.atualizar());
+          this.atualizar();
+          setInterval(() => this.atualizar(), this.#intervaloMs);
+        }
+
+        async atualizar() {
+          if (this.#emAndamento) return;   // evita duas buscas ao mesmo tempo
+          this.#emAndamento = true;
+          this.#tela.mostrarCarregando();
+
+          try {
+            const itens     = await this.#repositorio.listarTodas();
+            const registros = this.#montarRegistros(itens);
+
+            if (registros.length === 0) this.#tela.mostrarVazio();
+            else                        this.#tela.mostrarLista(registros);
+
+          } catch (erro) {
+            console.error(erro);
+            this.#tela.mostrarErro(erro);
+
+          } finally {
+            this.#emAndamento = false;
+            this.#tela.liberarBotao();
+          }
+        }
+
+        #montarRegistros(itens) {
+          return itens
+            .map(item => ({
+              inferencia: normalizarInferencia(item),
+              urlImagem:  this.#assinador.assinar(item[CONFIG.campoS3Uri])
+            }))
+            .sort(maisRecentePrimeiro);
+        }
+      }
+
+
+      // ============================================================
+      // 9. INICIALIZAÇÃO
+      // ============================================================
+      const { dynamodb, s3 } = criarClientesAws(CONFIG);
+
+      new Aplicacao({
+        repositorio: new RepositorioDeInferencias(dynamodb, CONFIG.tabelaDynamoDB),
+        assinador:   new AssinadorDeUrlS3(s3, CONFIG.expiracaoUrlImagemSegundos),
+        tela:        new TelaDeInferencias(CONFIG.intervaloAtualizacaoMs),
+        intervaloMs: CONFIG.intervaloAtualizacaoMs
+      }).iniciar();
+    })();
+  </script>
+</body>
+</html>
