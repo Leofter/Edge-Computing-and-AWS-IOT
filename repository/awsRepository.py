@@ -92,10 +92,9 @@ class AwsSNS:
         self.sns_topic = sns_topic
 
     def publish(self, alerta: bool) -> str:
-        self.alerta = alerta
         # self.id_ocr = id_ocr -> futuramente adicionar
 
-        if self.alerta == True:
+        if alerta == True:
 
             mensage = {
                 "tipo": "ALERTA",

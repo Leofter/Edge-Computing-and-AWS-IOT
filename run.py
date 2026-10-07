@@ -35,7 +35,7 @@ TOPIC = os.getenv("TOPIC")
 S3_BUCKET = os.getenv("S3_BUCKET")
 
 # SNS
-SNS_TOPIC = os.getenv("SNS_TOPIC")
+SNS_TOPIC_ARN = os.getenv("SNS_TOPIC_ARN")
 
 # CONFIG YOLO
 yolo_model = os.getenv("YOLO_MODEL")
@@ -64,7 +64,7 @@ s3.connect(S3_BUCKET, CLIENT_ID)
 
 # connect sns
 sns = AwsSNS()
-sns.connect(SNS_TOPIC)
+sns.connect(SNS_TOPIC_ARN)
 
 # Connect iot
 mqtt_connection = mqtt_connection_builder.mtls_from_path(
