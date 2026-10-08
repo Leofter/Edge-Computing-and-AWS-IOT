@@ -34,9 +34,6 @@ TOPIC = os.getenv("TOPIC")
 # S3
 S3_BUCKET = os.getenv("S3_BUCKET")
 
-# SNS
-SNS_TOPIC_ARN = os.getenv("SNS_TOPIC_ARN")
-
 # CONFIG YOLO
 yolo_model = os.getenv("YOLO_MODEL")
 image_path = os.getenv("IMAGE_PATH")  # corrigir para dataset e image
@@ -61,10 +58,6 @@ ocr_result = ocr.apply_ocr(ocr_init, image_roi, ocr_output)
 # connect s3
 s3 = AwsS3()
 s3.connect(S3_BUCKET, CLIENT_ID)
-
-# connect sns
-sns = AwsSNS()
-sns.connect(SNS_TOPIC_ARN)
 
 # Connect iot
 mqtt_connection = mqtt_connection_builder.mtls_from_path(
@@ -109,9 +102,6 @@ for file, item in zip(files, ocr_result):
         topic=TOPIC, payload=json.dumps(message), qos=mqtt.QoS.AT_LEAST_ONCE
     )
     print(f"Test message sent: {message}")
-
-    sns.publish(True)
-
 
 mqtt_connection.disconnect().result()
 print("Disconnected IOT")
