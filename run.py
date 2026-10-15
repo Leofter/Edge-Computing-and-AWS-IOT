@@ -14,7 +14,6 @@ from service.pipeline import detection as dt
 from datetime import datetime
 
 from repository.awsRepository import AwsS3
-from repository.awsRepository import AwsSNS
 
 from validation.valid_path import ValidPath
 

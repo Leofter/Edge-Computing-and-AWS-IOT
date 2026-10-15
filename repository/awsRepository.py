@@ -85,6 +85,9 @@ class AwsS3:
 
 
 class AwsSNS:
+    """
+    Funcão de conexao direta com sns para envio de mensagens
+    """
 
     def connect(self, sns_topic):
         self.sns = boto3.resource("sns", region_name="us-east-2")
