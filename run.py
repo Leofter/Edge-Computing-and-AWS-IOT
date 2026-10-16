@@ -3,6 +3,7 @@ from awsiot import mqtt_connection_builder
 import time
 import json
 import uuid
+from collections import deque
 
 import os
 from dotenv import load_dotenv
@@ -35,7 +36,7 @@ S3_BUCKET = os.getenv("S3_BUCKET")
 
 # CONFIG YOLO
 yolo_model = os.getenv("YOLO_MODEL")
-image_path = os.getenv("IMAGE_PATH")  # corrigir para dataset e image
+image_path = os.getenv("IMAGE_PATH")
 conf = 0.5
 
 # CONFIG OCR
@@ -50,13 +51,10 @@ Crop_mode = roi.Crop(image_path)
 # RUN
 detection_result = dt.apply_detection(detector, image_path, conf)
 
-image_roi = roi.apply_roi(Crop_mode, detection_result)
+image_roi, images_paths = roi.apply_roi(Crop_mode, detection_result)
 
 ocr_result = ocr.apply_ocr(ocr_init, image_roi, ocr_output)
 
-# connect s3
-s3 = AwsS3()
-s3.connect(S3_BUCKET, CLIENT_ID)
 
 # Connect iot
 mqtt_connection = mqtt_connection_builder.mtls_from_path(
@@ -72,9 +70,12 @@ mqtt_connection = mqtt_connection_builder.mtls_from_path(
 mqtt_connection.connect().result()
 print("Connected iot")
 
+# connect s3
+s3 = AwsS3()
+s3.connect(S3_BUCKET, CLIENT_ID)
 
-files = list(ValidPath().validation(image_path))
-
+# files = ValidPath().validation(images_paths)
+files = images_paths
 
 for file, item in zip(files, ocr_result):
 

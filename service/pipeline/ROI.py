@@ -20,6 +20,8 @@ class Crop(Roi):
 
     def crop(self, detections: List[Tuple[str, ndarray]]) -> List[ndarray]:
         roi_images = []
+        images_paths = []
+        print(detections)
 
         for image_path, boxes in detections:
             image = cv2.imread(image_path)
@@ -27,8 +29,10 @@ class Crop(Roi):
             for box in boxes:
                 xmin, ymin, xmax, ymax = np.asarray(box, dtype=int)
                 roi_images.append(image[ymin:ymax, xmin:xmax])
+                images_paths.append(image_path)
+                print(f"Roi imagem {image_path}")
 
-        return roi_images
+        return roi_images, images_paths
 
 
 def apply_roi(roi: Roi, xyxy: List[Tuple[str, ndarray]]) -> List[ndarray]:
